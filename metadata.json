@@ -1,0 +1,6 @@
+{
+  "name": "CampQuest - School Camping Trip Planner",
+  "description": "Interactive school camping trip planner for Palermo, Santa Cruz, Bolivia with horizontal day-by-day timelines, drag-and-drop activity cards, geospatial map, gear supplies manifest, chaperone assignments, and start from scratch plan builder.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

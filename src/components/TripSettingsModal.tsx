@@ -1,0 +1,282 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  X, 
+  Settings, 
+  Calendar, 
+  MapPin, 
+  Users, 
+  Plus, 
+  Trash2, 
+  RotateCcw, 
+  Save 
+} from 'lucide-react';
+import { DayPlan, TripProject } from '../types';
+
+interface TripSettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  project: TripProject;
+  onSave: (updated: Partial<TripProject>) => void;
+  onResetToSampleData: () => void;
+}
+
+export const TripSettingsModal: React.FC<TripSettingsModalProps> = ({
+  isOpen,
+  onClose,
+  project,
+  onSave,
+  onResetToSampleData,
+}) => {
+  const [tripName, setTripName] = useState(project.tripName);
+  const [destination, setDestination] = useState(project.destination);
+  const [startDate, setStartDate] = useState(project.startDate);
+  const [endDate, setEndDate] = useState(project.endDate);
+  const [expectedStudents, setExpectedStudents] = useState(project.expectedStudents);
+  const [days, setDays] = useState<DayPlan[]>(project.days);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTripName(project.tripName);
+      setDestination(project.destination);
+      setStartDate(project.startDate);
+      setEndDate(project.endDate);
+      setExpectedStudents(project.expectedStudents);
+      setDays(project.days);
+    }
+  }, [isOpen, project]);
+
+  if (!isOpen) return null;
+
+  const handleUpdateDay = (index: number, field: keyof DayPlan, val: any) => {
+    const updated = [...days];
+    updated[index] = { ...updated[index], [field]: val };
+    setDays(updated);
+  };
+
+  const handleAddDay = () => {
+    const nextDayNum = days.length + 1;
+    const newDay: DayPlan = {
+      id: `day-${Date.now()}`,
+      dayNumber: nextDayNum,
+      dateStr: '2026-10-31',
+      title: `Day ${nextDayNum}: Adventure Continuation`,
+      subtitle: 'Extra outdoor explorations and team bonding',
+      startTime: '08:00',
+      activityIds: [],
+    };
+    setDays([...days, newDay]);
+  };
+
+  const handleRemoveDay = (index: number) => {
+    if (days.length <= 1) {
+      alert('Trip must have at least one day.');
+      return;
+    }
+    if (confirm(`Remove Day ${days[index].dayNumber}? Any activity cards placed on this day will return to the Activity Bank.`)) {
+      const filtered = days.filter((_, i) => i !== index).map((d, i) => ({
+        ...d,
+        dayNumber: i + 1,
+      }));
+      setDays(filtered);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      tripName: tripName.trim(),
+      destination: destination.trim(),
+      startDate,
+      endDate,
+      expectedStudents: Number(expectedStudents) || 30,
+      days,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs overflow-y-auto">
+      <div className="bg-amber-50 rounded-3xl border-3 border-amber-800/80 shadow-2xl max-w-2xl w-full overflow-hidden animate-in zoom-in-95">
+        <div className="bg-amber-700 text-white px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-amber-200" />
+            <h2 className="text-lg font-black font-display tracking-tight">
+              Expedition Configuration
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-amber-200 hover:text-white"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto custom-scrollbar">
+          {/* Trip Name */}
+          <div>
+            <label className="block text-xs font-black uppercase text-amber-950 mb-1">
+              Trip Name
+            </label>
+            <input
+              type="text"
+              required
+              value={tripName}
+              onChange={(e) => setTripName(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 font-bold text-stone-800 text-sm outline-none focus:border-amber-600"
+            />
+          </div>
+
+          {/* Destination */}
+          <div>
+            <label className="block text-xs font-black uppercase text-amber-950 mb-1">
+              Destination & Campsite Details
+            </label>
+            <input
+              type="text"
+              required
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-semibold text-stone-800 outline-none focus:border-amber-600"
+            />
+          </div>
+
+          {/* Date range & Students */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-black uppercase text-amber-950 mb-1">
+                Start Date
+              </label>
+              <input
+                type="date"
+                required
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-stone-800 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-black uppercase text-amber-950 mb-1">
+                End Date
+              </label>
+              <input
+                type="date"
+                required
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-stone-800 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-black uppercase text-amber-950 mb-1">
+                Expected Campers
+              </label>
+              <input
+                type="number"
+                min={5}
+                max={500}
+                value={expectedStudents}
+                onChange={(e) => setExpectedStudents(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-stone-800 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Days breakdown (2-3 days customizable) */}
+          <div className="bg-amber-100/60 p-4 rounded-2xl border border-amber-300 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider text-amber-950">
+                Expedition Days & Daily Themes ({days.length} Days)
+              </span>
+              <button
+                type="button"
+                onClick={handleAddDay}
+                className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 hover:text-amber-950 bg-white px-2.5 py-1 rounded-lg border border-amber-300"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Day</span>
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {days.map((d, index) => (
+                <div
+                  key={d.id}
+                  className="bg-white p-3 rounded-xl border border-amber-200 flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between"
+                >
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <span className="w-6 h-6 rounded-full bg-amber-700 text-white flex items-center justify-center font-black text-xs shrink-0">
+                      {d.dayNumber}
+                    </span>
+                    <input
+                      type="text"
+                      value={d.title}
+                      onChange={(e) => handleUpdateDay(index, 'title', e.target.value)}
+                      className="font-bold text-xs text-stone-800 border-b border-stone-200 focus:border-amber-600 outline-none flex-1 sm:w-60 px-1 py-0.5"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <input
+                      type="date"
+                      value={d.dateStr}
+                      onChange={(e) => handleUpdateDay(index, 'dateStr', e.target.value)}
+                      className="text-xs font-medium text-stone-600 border border-stone-200 rounded px-1.5 py-0.5 outline-none"
+                    />
+                    {days.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveDay(index)}
+                        className="text-stone-400 hover:text-red-700 p-1"
+                        title="Delete this day"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Reset button */}
+          <div className="pt-2 border-t border-amber-200 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm('Reset the trip back to default sample activities and schedule? Custom edits will be overwritten.')) {
+                  onResetToSampleData();
+                  onClose();
+                }
+              }}
+              className="text-xs font-bold text-stone-500 hover:text-amber-800 flex items-center gap-1"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset to Sample Data</span>
+            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-stone-600 hover:bg-amber-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl text-xs font-black uppercase bg-amber-700 text-white hover:bg-amber-800 shadow-xs flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Apply Settings</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};

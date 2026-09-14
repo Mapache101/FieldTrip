@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Student record from SCIS school roster with grade, house, and name",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique student identifier" },
+        "name": { "type": "string", "description": "Full student name" },
+        "grade": { "type": "string", "description": "Class/grade level, e.g. 1sA, 4sA, 8sA" },
+        "house": { "type": "string", "description": "SCIS House: centaurs, pegasus, titans, unicorns" }
+      },
+      "required": ["name", "grade"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily or activity attendance log for students",
+      "type": "object",
+      "properties": {
+        "class": { "type": "string", "description": "Grade code" },
+        "teacherEmail": { "type": "string", "description": "Email of recording teacher" },
+        "timestamp": { "type": "string", "description": "Timestamp of check-in" },
+        "records": { "type": "array", "description": "List of student statuses and moods" }
+      },
+      "required": ["class", "teacherEmail"]
+    },
+    "CampQuestTrip": {
+      "title": "CampQuestTrip",
+      "description": "School wilderness camping trip plan with itineraries, student cohorts, and logistics",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Trip plan unique ID" },
+        "tripName": { "type": "string", "description": "Name of expedition" },
+        "destination": { "type": "string", "description": "Destination address and GPS coordinates" },
+        "lastSavedAt": { "type": "string", "description": "ISO timestamp of last modification" }
+      },
+      "required": ["id", "tripName", "destination"]
+    }
+  },
+  "firestore": {
+    "/artifacts/scis-house-points/public/data/students": {
+      "schema": "Student",
+      "description": "Public read roster of SCIS school students across all grades"
+    },
+    "/artifacts/scis-house-points/public/data/attendance": {
+      "schema": "Attendance",
+      "description": "Attendance tracking records for classes and activities"
+    },
+    "/artifacts/scis-house-points/public/data/campquest_trips": {
+      "schema": "CampQuestTrip",
+      "description": "CampQuest collaborative expedition plans"
+    }
+  }
+}
