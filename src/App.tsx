@@ -488,6 +488,7 @@ export default function App() {
           <CalendarView
             project={project}
             onUpdateMilestones={handleUpdateMilestones}
+            onOpenSettings={() => setIsSettingsOpen(true)}
           />
         )}
       </main>

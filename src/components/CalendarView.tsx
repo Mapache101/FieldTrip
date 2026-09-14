@@ -20,11 +20,13 @@ import { ProjectMilestone, TripProject } from '../types';
 interface CalendarViewProps {
   project: TripProject;
   onUpdateMilestones: (milestones: ProjectMilestone[]) => void;
+  onOpenSettings?: () => void;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
   project,
   onUpdateMilestones,
+  onOpenSettings,
 }) => {
   // Calendar month state: initialize to October 2026 (the trip month!)
   const [currentYear, setCurrentYear] = useState(2026);
@@ -122,20 +124,33 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 Project Milestones & Planning Calendar
               </h2>
               <p className="text-xs text-stone-600 font-medium">
-                Track parent deadlines, bus confirmations, district approvals, and the October 2026 departure
+                Track parent deadlines, bus confirmations, district approvals, and the expedition schedule ({project.startDate} to {project.endDate})
               </p>
             </div>
           </div>
 
-          <button
-            id="add-milestone-btn"
-            type="button"
-            onClick={() => setIsAddingMilestone(true)}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black uppercase bg-amber-700 hover:bg-amber-800 text-white shadow-xs transition-colors self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Milestone</span>
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            {onOpenSettings && (
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-white text-stone-700 hover:bg-stone-50 border border-amber-300 shadow-2xs transition-colors"
+                title="Change expedition start/end dates or day schedule"
+              >
+                <CalendarIcon className="w-4 h-4 text-emerald-700" />
+                <span>Change Trip Dates</span>
+              </button>
+            )}
+            <button
+              id="add-milestone-btn"
+              type="button"
+              onClick={() => setIsAddingMilestone(true)}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black uppercase bg-amber-700 hover:bg-amber-800 text-white shadow-xs transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Milestone</span>
+            </button>
+          </div>
         </div>
 
         {/* Milestone Progress bar */}

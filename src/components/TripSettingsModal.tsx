@@ -33,6 +33,7 @@ export const TripSettingsModal: React.FC<TripSettingsModalProps> = ({
   const [endDate, setEndDate] = useState(project.endDate);
   const [expectedStudents, setExpectedStudents] = useState(project.expectedStudents);
   const [days, setDays] = useState<DayPlan[]>(project.days);
+  const [autoShiftDays, setAutoShiftDays] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
@@ -47,24 +48,82 @@ export const TripSettingsModal: React.FC<TripSettingsModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Smart Start Date change with automatic daily date shifting
+  const handleStartDateChange = (newStart: string) => {
+    const oldStart = startDate;
+    setStartDate(newStart);
+
+    if (autoShiftDays && newStart && oldStart) {
+      const oldTime = new Date(oldStart + 'T00:00:00').getTime();
+      const newTime = new Date(newStart + 'T00:00:00').getTime();
+      const diffDays = Math.round((newTime - oldTime) / (1000 * 60 * 60 * 24));
+
+      if (!isNaN(diffDays) && diffDays !== 0) {
+        // Shift end date by same delta
+        const oldEndTime = new Date(endDate + 'T00:00:00').getTime();
+        if (!isNaN(oldEndTime)) {
+          const newEndTime = new Date(oldEndTime + diffDays * 24 * 60 * 60 * 1000);
+          setEndDate(newEndTime.toISOString().split('T')[0]);
+        }
+
+        // Shift all day dates
+        const updatedDays = days.map((day) => {
+          const dayTime = new Date(day.dateStr + 'T00:00:00').getTime();
+          if (!isNaN(dayTime)) {
+            const shifted = new Date(dayTime + diffDays * 24 * 60 * 60 * 1000);
+            return {
+              ...day,
+              dateStr: shifted.toISOString().split('T')[0],
+            };
+          }
+          return day;
+        });
+        setDays(updatedDays);
+      }
+    }
+  };
+
   const handleUpdateDay = (index: number, field: keyof DayPlan, val: any) => {
     const updated = [...days];
     updated[index] = { ...updated[index], [field]: val };
+    
+    // If the last day's date was edited, update endDate
+    if (field === 'dateStr' && index === days.length - 1) {
+      setEndDate(val);
+    }
+    // If the first day's date was edited, update startDate
+    if (field === 'dateStr' && index === 0) {
+      setStartDate(val);
+    }
+
     setDays(updated);
   };
 
   const handleAddDay = () => {
     const nextDayNum = days.length + 1;
+    let nextDateStr = '2026-10-31';
+    if (days.length > 0) {
+      const lastDay = days[days.length - 1];
+      const lastTime = new Date(lastDay.dateStr + 'T00:00:00').getTime();
+      if (!isNaN(lastTime)) {
+        const nextTime = new Date(lastTime + 24 * 60 * 60 * 1000);
+        nextDateStr = nextTime.toISOString().split('T')[0];
+      }
+    }
+
     const newDay: DayPlan = {
       id: `day-${Date.now()}`,
       dayNumber: nextDayNum,
-      dateStr: '2026-10-31',
+      dateStr: nextDateStr,
       title: `Day ${nextDayNum}: Adventure Continuation`,
       subtitle: 'Extra outdoor explorations and team bonding',
       startTime: '08:00',
       activityIds: [],
     };
-    setDays([...days, newDay]);
+
+    const updated = [...days, newDay];
+    setDays(updated);
+    setEndDate(nextDateStr);
   };
 
   const handleRemoveDay = (index: number) => {
@@ -78,6 +137,9 @@ export const TripSettingsModal: React.FC<TripSettingsModalProps> = ({
         dayNumber: i + 1,
       }));
       setDays(filtered);
+      if (filtered.length > 0) {
+        setEndDate(filtered[filtered.length - 1].dateStr);
+      }
     }
   };
 
@@ -143,45 +205,66 @@ export const TripSettingsModal: React.FC<TripSettingsModalProps> = ({
           </div>
 
           {/* Date range & Students */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-black uppercase text-amber-950 mb-1">
-                Start Date
-              </label>
-              <input
-                type="date"
-                required
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-stone-800 outline-none"
-              />
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-black uppercase text-amber-950 mb-1">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={startDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-stone-800 outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black uppercase text-amber-950 mb-1">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-stone-800 outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black uppercase text-amber-950 mb-1">
+                  Expected Campers
+                </label>
+                <input
+                  type="number"
+                  min={5}
+                  max={500}
+                  value={expectedStudents}
+                  onChange={(e) => setExpectedStudents(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-stone-800 outline-none focus:border-amber-600"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-black uppercase text-amber-950 mb-1">
-                End Date
+            {/* Auto-shift helper info */}
+            <div className="flex items-center justify-between gap-2 text-xs bg-amber-100/70 px-3 py-2 rounded-xl border border-amber-200">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoShiftDays}
+                  onChange={(e) => setAutoShiftDays(e.target.checked)}
+                  className="w-4 h-4 rounded text-amber-700 focus:ring-amber-600 border-amber-300"
+                />
+                <span className="font-semibold text-amber-950">
+                  Auto-shift all day dates when changing Start Date
+                </span>
               </label>
-              <input
-                type="date"
-                required
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-stone-800 outline-none"
-              />
-            </div>
 
-            <div>
-              <label className="block text-xs font-black uppercase text-amber-950 mb-1">
-                Expected Campers
-              </label>
-              <input
-                type="number"
-                min={5}
-                max={500}
-                value={expectedStudents}
-                onChange={(e) => setExpectedStudents(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-bold text-stone-800 outline-none"
-              />
+              <span className="font-bold text-amber-900 bg-white/80 px-2 py-0.5 rounded-md border border-amber-300 text-[11px]">
+                {days.length} Day Expedition
+              </span>
             </div>
           </div>
 
