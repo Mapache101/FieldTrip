@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default-deny all undefined paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Primitives
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation Blueprint for Trip document
+    function isValidTrip(data) {
+      return data.id is string && isValidId(data.id)
+        && data.tripName is string && data.tripName.size() > 0 && data.tripName.size() <= 150
+        && (!('destination' in data) || (data.destination is string && data.destination.size() <= 200))
+        && data.startDate is string && data.startDate.size() <= 30
+        && data.endDate is string && data.endDate.size() <= 30
+        && data.days is list && data.days.size() >= 1 && data.days.size() <= 14
+        && (!('expectedStudents' in data) || (data.expectedStudents is number && data.expectedStudents >= 0 && data.expectedStudents <= 2000))
+        && (!('activities' in data) || (data.activities is list && data.activities.size() <= 500))
+        && (!('supplies' in data) || (data.supplies is list && data.supplies.size() <= 500))
+        && (!('studentItems' in data) || (data.studentItems is list && data.studentItems.size() <= 500))
+        && (!('teachers' in data) || (data.teachers is list && data.teachers.size() <= 100))
+        && (!('milestones' in data) || (data.milestones is list && data.milestones.size() <= 200))
+        && (!('studentGroups' in data) || (data.studentGroups is list && data.studentGroups.size() <= 50))
+        && (!('students' in data) || (data.students is list && data.students.size() <= 1000));
+    }
+
+    // Collaborative trips collection
+    match /trips/{tripId} {
+      allow get: if isValidId(tripId);
+      allow list: if true;
+      allow create: if isValidId(tripId) && incoming().id == tripId && isValidTrip(incoming());
+      allow update: if isValidId(tripId) && isValidTrip(incoming()) && incoming().id == existing().id;
+      allow delete: if isValidId(tripId);
+    }
+  }
+}

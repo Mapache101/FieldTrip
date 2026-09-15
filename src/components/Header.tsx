@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { TripProject } from '../types';
 import { FirebaseAuthButton } from './FirebaseAuthButton';
+import { RefreshCw, Radio, CheckCircle, Wifi, AlertCircle } from 'lucide-react';
 
 interface HeaderProps {
   project: TripProject;
@@ -23,6 +24,9 @@ interface HeaderProps {
   onOpenShare: () => void;
   onPrint: () => void;
   onOpenNewPlan: () => void;
+  syncStatus?: 'connected' | 'saving' | 'offline' | 'error';
+  lastSyncedTime?: string | null;
+  onCopyLiveLink?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,6 +37,9 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenShare,
   onPrint,
   onOpenNewPlan,
+  syncStatus = 'connected',
+  lastSyncedTime,
+  onCopyLiveLink,
 }) => {
   return (
     <header className="bg-white border-b border-stone-200 sticky top-0 z-30 shadow-2xs">
@@ -80,6 +87,41 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Action Toolbar */}
           <div className="flex items-center gap-1.5 self-end sm:self-center flex-wrap">
+            {/* Real-Time Live Sync Status Indicator */}
+            <div
+              id="header-live-sync-indicator"
+              title={
+                syncStatus === 'connected'
+                  ? `Live real-time sync active${lastSyncedTime ? ` (Last saved: ${lastSyncedTime})` : ''}. Any collaborator with the link sees changes instantly.`
+                  : syncStatus === 'saving'
+                  ? 'Saving changes to cloud in real time...'
+                  : 'Syncing issue or offline mode'
+              }
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                syncStatus === 'connected'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  : syncStatus === 'saving'
+                  ? 'bg-amber-50 text-amber-800 border-amber-300'
+                  : 'bg-rose-50 text-rose-800 border-rose-300'
+              }`}
+            >
+              {syncStatus === 'connected' && (
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                </span>
+              )}
+              {syncStatus === 'saving' && (
+                <RefreshCw className="w-3 h-3 text-amber-600 animate-spin" />
+              )}
+              {syncStatus === 'error' && (
+                <AlertCircle className="w-3 h-3 text-rose-600" />
+              )}
+              <span className="text-[11px] uppercase tracking-wide">
+                {syncStatus === 'connected' ? 'Live Synced' : syncStatus === 'saving' ? 'Syncing...' : 'Sync Retry'}
+              </span>
+            </div>
+
             {/* Start New Plan Button */}
             <button
               id="header-new-plan-btn"

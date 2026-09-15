@@ -1,54 +1,89 @@
 {
   "entities": {
-    "Student": {
-      "title": "Student",
-      "description": "Student record from SCIS school roster with grade, house, and name",
+    "Trip": {
+      "title": "Trip",
+      "description": "Collaborative expedition plan with activities, schedule, gear, chaperones, and student rosters",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique student identifier" },
-        "name": { "type": "string", "description": "Full student name" },
-        "grade": { "type": "string", "description": "Class/grade level, e.g. 1sA, 4sA, 8sA" },
-        "house": { "type": "string", "description": "SCIS House: centaurs, pegasus, titans, unicorns" }
+        "id": {
+          "type": "string",
+          "description": "Unique trip plan identifier",
+          "maxLength": 128
+        },
+        "tripName": {
+          "type": "string",
+          "description": "Name of the expedition or field trip",
+          "maxLength": 150
+        },
+        "destination": {
+          "type": "string",
+          "description": "Destination name, campground, or address",
+          "maxLength": 200
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Start date in YYYY-MM-DD format",
+          "maxLength": 30
+        },
+        "endDate": {
+          "type": "string",
+          "description": "End date in YYYY-MM-DD format",
+          "maxLength": 30
+        },
+        "expectedStudents": {
+          "type": "number",
+          "description": "Total number of anticipated student attendees"
+        },
+        "days": {
+          "type": "array",
+          "description": "List of day plans with timeline slots and themes"
+        },
+        "activities": {
+          "type": "array",
+          "description": "List of scheduled and bank activities"
+        },
+        "supplies": {
+          "type": "array",
+          "description": "Master equipment and supplies checklist"
+        },
+        "studentItems": {
+          "type": "array",
+          "description": "Required student packing gear items"
+        },
+        "teachers": {
+          "type": "array",
+          "description": "Lead coordinators and teacher chaperone assignments"
+        },
+        "milestones": {
+          "type": "array",
+          "description": "Pre-trip preparation tasks and deadlines"
+        },
+        "studentGroups": {
+          "type": "array",
+          "description": "Cohort waves and groups (e.g. Group 1, Group 2)"
+        },
+        "students": {
+          "type": "array",
+          "description": "Student attendees, houses, and medical dietary requirements"
+        },
+        "lastSavedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last live edit",
+          "maxLength": 50
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "Display name or email of user who made the last change",
+          "maxLength": 100
+        }
       },
-      "required": ["name", "grade"]
-    },
-    "Attendance": {
-      "title": "Attendance",
-      "description": "Daily or activity attendance log for students",
-      "type": "object",
-      "properties": {
-        "class": { "type": "string", "description": "Grade code" },
-        "teacherEmail": { "type": "string", "description": "Email of recording teacher" },
-        "timestamp": { "type": "string", "description": "Timestamp of check-in" },
-        "records": { "type": "array", "description": "List of student statuses and moods" }
-      },
-      "required": ["class", "teacherEmail"]
-    },
-    "CampQuestTrip": {
-      "title": "CampQuestTrip",
-      "description": "School wilderness camping trip plan with itineraries, student cohorts, and logistics",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string", "description": "Trip plan unique ID" },
-        "tripName": { "type": "string", "description": "Name of expedition" },
-        "destination": { "type": "string", "description": "Destination address and GPS coordinates" },
-        "lastSavedAt": { "type": "string", "description": "ISO timestamp of last modification" }
-      },
-      "required": ["id", "tripName", "destination"]
+      "required": ["id", "tripName", "startDate", "endDate", "days"]
     }
   },
   "firestore": {
-    "/artifacts/scis-house-points/public/data/students": {
-      "schema": "Student",
-      "description": "Public read roster of SCIS school students across all grades"
-    },
-    "/artifacts/scis-house-points/public/data/attendance": {
-      "schema": "Attendance",
-      "description": "Attendance tracking records for classes and activities"
-    },
-    "/artifacts/scis-house-points/public/data/campquest_trips": {
-      "schema": "CampQuestTrip",
-      "description": "CampQuest collaborative expedition plans"
+    "/trips/{tripId}": {
+      "schema": "Trip",
+      "description": "Live collaborative trip projects shared across all coordinators"
     }
   }
 }

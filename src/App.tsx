@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TripProject, ActivityCard, MasterSupplyItem, StudentRequiredItem, TeacherChaperone, ProjectMilestone, StudentGroup, StudentProfile } from './types';
 import { INITIAL_PROJECT } from './data/initialTripData';
 import { decodeProjectFromUrlHash } from './utils/tripHelpers';
+import {
+  getCurrentTripIdFromUrl,
+  setTripIdInUrl,
+  subscribeToTrip,
+  saveTripToCloud,
+  DEFAULT_TRIP_ID,
+} from './services/tripSyncService';
 import { Header } from './components/Header';
 import { TimelineBoard } from './components/TimelineBoard';
 import { DeskBoardView } from './components/DeskBoardView';
@@ -20,6 +27,12 @@ import { NewPlanModal } from './components/NewPlanModal';
 const STORAGE_KEY = 'CAMPQUEST_TRIP_PROJECT_V2';
 
 export default function App() {
+  // Current Trip ID from URL query param ?trip=... or default
+  const [tripId, setTripId] = useState<string>(() => getCurrentTripIdFromUrl());
+  const [syncStatus, setSyncStatus] = useState<'connected' | 'saving' | 'offline' | 'error'>('connected');
+  const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
+  const isRemoteUpdateRef = useRef(false);
+
   // Initialize project state from URL hash first, then localStorage, then initial mock data
   const [project, setProject] = useState<TripProject>(() => {
     const fromUrl = decodeProjectFromUrlHash();
@@ -65,6 +78,68 @@ export default function App() {
     }
   }, [project.tripName]);
 
+  // Real-time listener: subscribe to active trip in Firestore
+  useEffect(() => {
+    setTripIdInUrl(tripId);
+    const unsubscribe = subscribeToTrip(
+      tripId,
+      (remoteProject) => {
+        if (remoteProject && remoteProject.id) {
+          isRemoteUpdateRef.current = true;
+          setProject((prev) => ({
+            ...prev,
+            ...remoteProject,
+            id: remoteProject.id || tripId,
+            days: remoteProject.days || prev.days,
+            activities: remoteProject.activities || prev.activities,
+            supplies: remoteProject.supplies || prev.supplies,
+            studentItems: remoteProject.studentItems || prev.studentItems,
+            teachers: remoteProject.teachers || prev.teachers,
+            milestones: remoteProject.milestones || prev.milestones,
+            studentGroups: remoteProject.studentGroups || prev.studentGroups,
+            students: remoteProject.students || prev.students,
+          }));
+          setLastSyncedTime(
+            new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          );
+          setTimeout(() => {
+            isRemoteUpdateRef.current = false;
+          }, 200);
+        }
+      },
+      (status) => {
+        setSyncStatus(status);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [tripId]);
+
+  // Real-time publisher: auto-save local modifications to Cloud Firestore
+  useEffect(() => {
+    // Skip if incoming update was triggered by remote snapshot listener
+    if (isRemoteUpdateRef.current) return;
+
+    setSyncStatus('saving');
+    const timer = setTimeout(async () => {
+      try {
+        await saveTripToCloud({
+          ...project,
+          id: tripId,
+        });
+        setSyncStatus('connected');
+        setLastSyncedTime(
+          new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        );
+      } catch (err) {
+        console.warn('Real-time cloud sync warning:', err);
+        setSyncStatus('error');
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [project, tripId]);
+
   // Active view tab (includes timeline, direct tabletop desk, interactive map, student groups, etc.)
   const [activeTab, setActiveTab] = useState<'timeline' | 'desk' | 'map' | 'students' | 'supplies' | 'teachers' | 'calendar'>('timeline');
 
@@ -84,7 +159,7 @@ export default function App() {
   const [isNewPlanOpen, setIsNewPlanOpen] = useState(false);
   const [printMode, setPrintMode] = useState<'none' | 'all' | 'student-packing'>('none');
 
-  // Save to localStorage on changes
+  // Save to localStorage on changes as offline fallback
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
@@ -352,6 +427,8 @@ export default function App() {
         onOpenShare={() => setIsShareOpen(true)}
         onPrint={() => setPrintMode('all')}
         onOpenNewPlan={() => setIsNewPlanOpen(true)}
+        syncStatus={syncStatus}
+        lastSyncedTime={lastSyncedTime}
       />
 
       {/* Main Content Area */}
@@ -518,12 +595,21 @@ export default function App() {
         onResetToSampleData={handleResetToSampleData}
       />
 
-      {/* Share & GitHub / Cloudflare Pages Guide Modal */}
+      {/* Share & Real-Time Collaboration Modal */}
       <ShareModal
         isOpen={isShareOpen}
         onClose={() => setIsShareOpen(false)}
         project={project}
-        onImportProject={(imported) => setProject(imported)}
+        tripId={tripId}
+        onImportProject={(imported) => {
+          const newId = imported.id || `trip-${Date.now()}`;
+          setTripId(newId);
+          setTripIdInUrl(newId);
+          setProject({
+            ...imported,
+            id: newId,
+          });
+        }}
       />
 
       {/* Start New Plan Modal */}
@@ -531,7 +617,13 @@ export default function App() {
         isOpen={isNewPlanOpen}
         onClose={() => setIsNewPlanOpen(false)}
         onCreateNewPlan={(newProject) => {
-          setProject(newProject);
+          const newId = newProject.id || `trip-${Date.now()}`;
+          setTripId(newId);
+          setTripIdInUrl(newId);
+          setProject({
+            ...newProject,
+            id: newId,
+          });
           setActiveDayId(newProject.days[0]?.id || 'day-1');
           setActiveTab('timeline');
         }}

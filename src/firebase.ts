@@ -15,6 +15,7 @@ import {
   doc,
   getDocs,
   getDoc,
+  getDocFromServer,
   setDoc,
   addDoc,
   onSnapshot,
@@ -23,23 +24,39 @@ import {
   orderBy,
   Timestamp,
 } from 'firebase/firestore';
+import firebaseConfig from '../firebase-applet-config.json';
 
-// SCIS HousePoints Firebase Configuration from https://github.com/Mapache101/HousePoints/blob/main/att2.html
-export const firebaseConfig = {
-  apiKey: "AIzaSyDyFV6WAZhpr4leljJOQozPzEWlNaU-heQ",
-  authDomain: "scis-house-points.firebaseapp.com",
-  projectId: "scis-house-points",
-  storageBucket: "scis-house-points.firebasestorage.app",
-  messagingSenderId: "929403398815",
-  appId: "1:929403398815:web:c6634925bfac5b665650aa"
+// Initialize Main Firebase App for CampQuest Real-Time Database
+export const app = getApps().find((a) => a.name === '[DEFAULT]') || initializeApp(firebaseConfig);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: Required for named database */
+export const auth = getAuth(app);
+
+// Test connection on boot as mandated by firebase-integration skill
+export async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Firebase client is offline or starting up.');
+    }
+  }
+}
+testConnection();
+
+// Secondary Firebase App for SCIS HousePoints Student Roster
+export const scisFirebaseConfig = {
+  apiKey: 'AIzaSyDyFV6WAZhpr4leljJOQozPzEWlNaU-heQ',
+  authDomain: 'scis-house-points.firebaseapp.com',
+  projectId: 'scis-house-points',
+  storageBucket: 'scis-house-points.firebasestorage.app',
+  messagingSenderId: '929403398815',
+  appId: '1:929403398815:web:c6634925bfac5b665650aa',
 };
 
 export const APP_ID = 'scis-house-points';
 
-// Initialize Firebase App
-export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const scisApp = getApps().find((a) => a.name === 'scis') || initializeApp(scisFirebaseConfig, 'scis');
+export const scisDb = getFirestore(scisApp);
 
 // Operation types for standard error handling
 export enum OperationType {
@@ -79,7 +96,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   return errInfo;
 }
 
-// Authentication Helpers matching att2.html
+// Authentication Helpers
 export async function signInWithMicrosoft() {
   const provider = new OAuthProvider('microsoft.com');
   provider.setCustomParameters({
@@ -133,17 +150,16 @@ export interface SCISStudentFirebase {
   displayName?: string;
 }
 
-// Fetch all SCIS students from Firestore
+// Fetch all SCIS students from external SCIS Firestore
 export async function fetchSCISStudents(): Promise<SCISStudentFirebase[]> {
   const path = `artifacts/${APP_ID}/public/data/students`;
   try {
-    const studentsCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'students');
+    const studentsCol = collection(scisDb, 'artifacts', APP_ID, 'public', 'data', 'students');
     const snap = await getDocs(studentsCol);
     const list: SCISStudentFirebase[] = [];
     snap.forEach((docSnap) => {
       const data = docSnap.data();
       let formattedGrade = data.grade || '';
-      // Normalization from att2.html
       formattedGrade = formattedGrade.replace(/s1/gi, 'sA').replace(/s2/gi, 'sB');
       list.push({
         id: docSnap.id,
@@ -168,7 +184,7 @@ export function subscribeSCISStudents(
   onError?: (err: unknown) => void
 ) {
   const path = `artifacts/${APP_ID}/public/data/students`;
-  const studentsCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'students');
+  const studentsCol = collection(scisDb, 'artifacts', APP_ID, 'public', 'data', 'students');
   return onSnapshot(
     studentsCol,
     (snap) => {
