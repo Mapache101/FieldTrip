@@ -32,6 +32,7 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<'connected' | 'saving' | 'offline' | 'error'>('connected');
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
   const isRemoteUpdateRef = useRef(false);
+  const hasLoadedRemoteRef = useRef(false);
 
   // Initialize project state from URL hash first, then localStorage, then initial mock data
   const [project, setProject] = useState<TripProject>(() => {
@@ -80,12 +81,14 @@ export default function App() {
 
   // Real-time listener: subscribe to active trip in Firestore
   useEffect(() => {
+    hasLoadedRemoteRef.current = false;
     setTripIdInUrl(tripId);
     const unsubscribe = subscribeToTrip(
       tripId,
       (remoteProject) => {
         if (remoteProject && remoteProject.id) {
           isRemoteUpdateRef.current = true;
+          hasLoadedRemoteRef.current = true;
           setProject((prev) => ({
             ...prev,
             ...remoteProject,
@@ -117,6 +120,8 @@ export default function App() {
 
   // Real-time publisher: auto-save local modifications to Cloud Firestore
   useEffect(() => {
+    // CRITICAL: Prevent saving local fallback state over an existing remote cloud plan on initial page load
+    if (!hasLoadedRemoteRef.current) return;
     // Skip if incoming update was triggered by remote snapshot listener
     if (isRemoteUpdateRef.current) return;
 
@@ -584,6 +589,7 @@ export default function App() {
         initialData={editingActivity}
         teachers={project.teachers}
         defaultLocation={defaultLocationForModal}
+        existingActivities={project.activities}
       />
 
       {/* Trip Configuration & Days Settings Modal */}

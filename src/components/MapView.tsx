@@ -123,6 +123,7 @@ export const MapView: React.FC<MapViewProps> = ({
     polylinesGroup.clearLayers();
 
     // 1. Add Basecamp Master Marker
+    const baseCampName = project.baseLocation?.name || 'Base Camp';
     const baseIcon = L.divIcon({
       className: 'custom-div-icon',
       html: `
@@ -132,7 +133,7 @@ export const MapView: React.FC<MapViewProps> = ({
             <span style="font-size: 20px;">⛺</span>
           </div>
           <div class="absolute -bottom-6 bg-stone-900/90 text-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap shadow-md border border-amber-500/40">
-            Campamento Base Palermo
+            ${baseCampName}
           </div>
         </div>
       `,
@@ -145,8 +146,8 @@ export const MapView: React.FC<MapViewProps> = ({
       .bindPopup(`
         <div style="font-family: 'Plus Jakarta Sans', sans-serif; min-width: 220px; padding: 4px;">
           <div style="font-size: 11px; font-weight: 800; color: #b45309; text-transform: uppercase;">Expedition Headquarters</div>
-          <div style="font-size: 15px; font-weight: 800; color: #1c1917; margin-top: 2px;">Campamento Base Palermo</div>
-          <div style="font-size: 12px; color: #78716c; margin-top: 4px;">Palermo, Santa Cruz Department, Bolivia</div>
+          <div style="font-size: 15px; font-weight: 800; color: #1c1917; margin-top: 2px;">${baseCampName}</div>
+          <div style="font-size: 12px; color: #78716c; margin-top: 4px;">${project.destination || 'Field Expedition'}</div>
           <div style="font-size: 11px; color: #0284c7; font-weight: 600; margin-top: 6px;">GPS: ${baseLat.toFixed(6)}, ${baseLng.toFixed(6)}</div>
           <div style="margin-top: 8px; font-size: 11px; color: #44403c; background: #fef3c7; padding: 6px; border-radius: 8px; border: 1px solid #fde68a;">
             Assembly point, first aid tent, and radio control base.

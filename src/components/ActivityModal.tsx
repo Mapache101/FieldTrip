@@ -28,6 +28,15 @@ interface ActivityModalProps {
   initialData?: ActivityCard | null;
   teachers: TeacherChaperone[];
   defaultLocation?: { lat: number; lng: number; locationName?: string } | null;
+  existingActivities?: ActivityCard[];
+}
+
+export interface PlanLocation {
+  name: string;
+  lat: number;
+  lng: number;
+  icon?: string;
+  count: number;
 }
 
 const COMMON_EQUIPMENT = [
@@ -41,18 +50,6 @@ const COMMON_SUPPLIES = [
   'Whistles', 'Aluminum Foil', 'Water Purification Tabs', 'Trash Bags', 'Insect Repellent', 'Sunscreen'
 ];
 
-const PALERMO_LOCATION_PRESETS = [
-  { name: 'Campamento Base Palermo', lat: -18.210799, lng: -63.748706, icon: '⛺' },
-  { name: 'Sendero Los Tajibos', lat: -18.208450, lng: -63.746120, icon: '🥾' },
-  { name: 'Arroyo Palermo (Creek)', lat: -18.212800, lng: -63.750500, icon: '🌊' },
-  { name: 'Círculo de Fogata Las Palmeras', lat: -18.211450, lng: -63.747650, icon: '🔥' },
-  { name: 'Quincho y Cocina de Campo', lat: -18.210150, lng: -63.747900, icon: '🍲' },
-  { name: 'Mirador de Aves y Curichi', lat: -18.207200, lng: -63.749500, icon: '🦅' },
-  { name: 'Área de Supervivencia El Palmar', lat: -18.209100, lng: -63.750800, icon: '🪵' },
-  { name: 'Sendero Nocturno Arroyo Palermo', lat: -18.212000, lng: -63.746500, icon: '🌙' },
-  { name: 'Plaza Ceremonial Palermo', lat: -18.210600, lng: -63.748500, icon: '🏅' },
-];
-
 export const ActivityModal: React.FC<ActivityModalProps> = ({
   isOpen,
   onClose,
@@ -61,6 +58,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
   initialData,
   teachers,
   defaultLocation,
+  existingActivities = [],
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -89,6 +87,54 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
   const mapInstanceRef = useRef<L.Map | null>(null);
   const activeMarkerRef = useRef<L.Marker | null>(null);
 
+  // Extract unique locations that have been created by users on this plan
+  const userPlanLocations = React.useMemo<PlanLocation[]>(() => {
+    if (!existingActivities || existingActivities.length === 0) return [];
+
+    const map = new Map<string, PlanLocation>();
+
+    for (const act of existingActivities) {
+      const trimmed = act.locationName?.trim();
+      if (!trimmed) continue;
+
+      const key = trimmed.toLowerCase();
+      let icon = '📍';
+      if (act.category === 'campcraft') icon = '🏕️';
+      else if (act.category === 'hike') icon = '🥾';
+      else if (act.category === 'water') icon = '🌊';
+      else if (act.category === 'campfire') icon = '🔥';
+      else if (act.category === 'meal') icon = '🍲';
+      else if (act.category === 'teamwork') icon = '🤝';
+      else if (act.category === 'rest') icon = '🧘';
+
+      const existing = map.get(key);
+      if (existing) {
+        existing.count += 1;
+        if (act.coordinates && typeof act.coordinates.lat === 'number' && typeof act.coordinates.lng === 'number') {
+          existing.lat = act.coordinates.lat;
+          existing.lng = act.coordinates.lng;
+        }
+      } else {
+        const lat = (act.coordinates && typeof act.coordinates.lat === 'number')
+          ? act.coordinates.lat
+          : (defaultLocation?.lat ?? -18.210799);
+        const lng = (act.coordinates && typeof act.coordinates.lng === 'number')
+          ? act.coordinates.lng
+          : (defaultLocation?.lng ?? -63.748706);
+
+        map.set(key, {
+          name: trimmed,
+          lat,
+          lng,
+          icon,
+          count: 1,
+        });
+      }
+    }
+
+    return Array.from(map.values());
+  }, [existingActivities, defaultLocation]);
+
   // Initialize interactive Leaflet map when user chooses to select location from map
   useEffect(() => {
     if (!isMapPickerOpen || !mapContainerRef.current) return;
@@ -112,25 +158,25 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
 
-    // Add preset landmark markers
-    PALERMO_LOCATION_PRESETS.forEach((preset) => {
+    // Add markers for locations already created on this plan by the user
+    userPlanLocations.forEach((loc) => {
       const landmarkIcon = L.divIcon({
         className: 'landmark-map-badge',
         html: `<div style="background: white; border: 1.5px solid #059669; border-radius: 9999px; padding: 2px 7px; font-size: 10px; font-weight: 700; color: #064e3b; box-shadow: 0 2px 4px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 3px; white-space: nowrap; cursor: pointer;">
-          <span>${preset.icon}</span><span>${preset.name}</span>
+          <span>${loc.icon || '📍'}</span><span>${loc.name}</span>
         </div>`,
         iconAnchor: [30, 14],
       });
 
-      L.marker([preset.lat, preset.lng], { icon: landmarkIcon })
+      L.marker([loc.lat, loc.lng], { icon: landmarkIcon })
         .addTo(map)
         .on('click', () => {
-          setLocationName(preset.name);
-          setLatStr(preset.lat.toFixed(6));
-          setLngStr(preset.lng.toFixed(6));
+          setLocationName(loc.name);
+          setLatStr(loc.lat.toFixed(6));
+          setLngStr(loc.lng.toFixed(6));
           setHasCoordinates(true);
           if (activeMarkerRef.current) {
-            activeMarkerRef.current.setLatLng([preset.lat, preset.lng]);
+            activeMarkerRef.current.setLatLng([loc.lat, loc.lng]);
           }
         });
     });
@@ -166,15 +212,13 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
       setHasCoordinates(true);
       activeMarker.setLatLng([lat, lng]);
 
-      // If locationName is blank or default, suggest nearby name
-      if (!locationName || locationName === 'Campamento Base Palermo') {
-        const nearest = PALERMO_LOCATION_PRESETS.find(
+      // If locationName is blank, check if user clicked near an existing plan location
+      if (!locationName) {
+        const nearest = userPlanLocations.find(
           (p) => Math.abs(p.lat - lat) < 0.0015 && Math.abs(p.lng - lng) < 0.0015
         );
         if (nearest) {
           setLocationName(nearest.name);
-        } else {
-          setLocationName(`Palermo Station (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
         }
       }
     });
@@ -191,7 +235,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
         mapInstanceRef.current = null;
       }
     };
-  }, [isMapPickerOpen]);
+  }, [isMapPickerOpen, userPlanLocations]);
 
   useEffect(() => {
     if (initialData) {
@@ -208,15 +252,16 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
       setNotes(initialData.notes || '');
       setWeatherDependent(!!initialData.weatherDependent);
       setAssignedGroup(initialData.assignedGroup || 'all');
-      setLocationName(initialData.locationName || 'Campamento Base Palermo');
+      setLocationName(initialData.locationName || '');
       if (initialData.coordinates) {
         setHasCoordinates(true);
         setLatStr(String(initialData.coordinates.lat));
         setLngStr(String(initialData.coordinates.lng));
       } else {
-        setHasCoordinates(true);
-        setLatStr('-18.210799');
-        setLngStr('-63.748706');
+        const fallback = userPlanLocations[0];
+        setHasCoordinates(false);
+        setLatStr(fallback ? String(fallback.lat) : '-18.210799');
+        setLngStr(fallback ? String(fallback.lng) : '-63.748706');
       }
     } else {
       setName('');
@@ -224,8 +269,8 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
       setDurationMinutes(60);
       setCategory('campcraft');
       setEnergyLevel('medium');
-      setEquipmentList(['12x 4-Person Tents', 'Ground Tarps']);
-      setSuppliesList(['Paracord Spool', 'Matches']);
+      setEquipmentList([]);
+      setSuppliesList([]);
       setLeadTeacherId(teachers[0]?.id || '');
       setAssistantTeacherIds([]);
       setStudentItemNeeded('');
@@ -233,18 +278,19 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
       setWeatherDependent(false);
       setAssignedGroup('all');
       if (defaultLocation) {
-        setLocationName(defaultLocation.locationName || 'Palermo Field Station');
+        setLocationName(defaultLocation.locationName || '');
         setLatStr(String(defaultLocation.lat));
         setLngStr(String(defaultLocation.lng));
         setHasCoordinates(true);
       } else {
-        setLocationName('Campamento Base Palermo');
-        setLatStr('-18.210799');
-        setLngStr('-63.748706');
+        const fallback = userPlanLocations[0];
+        setLocationName('');
+        setLatStr(fallback ? String(fallback.lat) : '-18.210799');
+        setLngStr(fallback ? String(fallback.lng) : '-63.748706');
         setHasCoordinates(true);
       }
     }
-  }, [initialData, teachers, isOpen, defaultLocation]);
+  }, [initialData, teachers, isOpen, defaultLocation, userPlanLocations]);
 
   if (!isOpen) return null;
 
@@ -280,14 +326,16 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
     }
   };
 
-  const applyPreset = (preset: typeof PALERMO_LOCATION_PRESETS[0]) => {
-    setLocationName(preset.name);
-    setLatStr(String(preset.lat));
-    setLngStr(String(preset.lng));
+  const applyLocation = (loc: PlanLocation) => {
+    setLocationName(loc.name);
+    setLatStr(loc.lat.toFixed(6));
+    setLngStr(loc.lng.toFixed(6));
     setHasCoordinates(true);
-    if (activeMarkerRef.current && mapInstanceRef.current) {
-      activeMarkerRef.current.setLatLng([preset.lat, preset.lng]);
-      mapInstanceRef.current.panTo([preset.lat, preset.lng]);
+    if (activeMarkerRef.current) {
+      activeMarkerRef.current.setLatLng([loc.lat, loc.lng]);
+    }
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.panTo([loc.lat, loc.lng]);
     }
   };
 
@@ -365,7 +413,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
               id="activity-name-input"
               type="text"
               required
-              placeholder="e.g. Sendero Los Tajibos Hike, Arroyo Palermo Creek Exploration..."
+              placeholder="e.g. Flora & Fauna Hike, Creek Exploration, Campfire Gathering..."
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl bg-white border border-stone-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 text-stone-900 font-bold text-base outline-none transition-all placeholder:text-stone-400 placeholder:font-normal"
@@ -392,7 +440,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
             <div className="flex items-center justify-between">
               <label className="text-xs font-black uppercase tracking-wider text-stone-900 flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-amber-800" />
-                <span>Geographic Station in Palermo, Santa Cruz Bolivia</span>
+                <span>Activity Location & Station</span>
               </label>
               <span className="text-[11px] font-bold text-amber-900 bg-amber-200 px-2 py-0.5 rounded-full">
                 Interactive Map Enabled
@@ -406,7 +454,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Laguna Palermo"
+                  placeholder="e.g. Basecamp, East Trail, Creek Bridge..."
                   value={locationName}
                   onChange={(e) => setLocationName(e.target.value)}
                   className="w-full px-3 py-1.5 rounded-xl bg-white border border-amber-300 font-medium text-xs text-stone-900 outline-none focus:border-amber-600"
@@ -478,7 +526,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                   <div className="flex items-center gap-1.5 text-stone-700 truncate">
                     <MapPin className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
                     <span className="truncate">
-                      Selected: <strong className="text-stone-900">{locationName || 'Campamento Base Palermo'}</strong>
+                      Selected: <strong className="text-stone-900">{locationName || 'Custom Pin on Map'}</strong>
                     </span>
                   </div>
                   <button
@@ -492,24 +540,51 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
               </div>
             )}
 
-            {/* Quick Presets for Palermo */}
+            {/* Locations created by users on this plan */}
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-stone-600 block mb-1">
-                Quick Palermo Landmarks:
-              </span>
-              <div className="flex flex-wrap gap-1">
-                {PALERMO_LOCATION_PRESETS.map((preset) => (
-                  <button
-                    key={preset.name}
-                    type="button"
-                    onClick={() => applyPreset(preset)}
-                    className="text-[10px] px-2 py-1 rounded-lg bg-white/90 hover:bg-white text-stone-800 border border-amber-300 font-bold transition-all hover:scale-102 flex items-center gap-1 shadow-2xs"
-                  >
-                    <span>{preset.icon}</span>
-                    <span>{preset.name}</span>
-                  </button>
-                ))}
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-stone-700">
+                  Locations on this Plan ({userPlanLocations.length}):
+                </span>
+                {userPlanLocations.length > 0 && (
+                  <span className="text-[10px] text-stone-500 font-medium">
+                    Click to reuse location
+                  </span>
+                )}
               </div>
+              {userPlanLocations.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                  {userPlanLocations.map((loc) => (
+                    <button
+                      key={loc.name}
+                      type="button"
+                      onClick={() => applyLocation(loc)}
+                      className={`text-[11px] px-2.5 py-1 rounded-lg border font-semibold transition-all hover:scale-102 flex items-center gap-1.5 shadow-2xs ${
+                        locationName.toLowerCase() === loc.name.toLowerCase()
+                          ? 'bg-emerald-700 text-white border-emerald-800 ring-2 ring-emerald-400'
+                          : 'bg-white hover:bg-emerald-50 text-stone-800 border-amber-300'
+                      }`}
+                      title={`${loc.name} (${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)})`}
+                    >
+                      <span>{loc.icon || '📍'}</span>
+                      <span className="truncate max-w-[200px]">{loc.name}</span>
+                      {loc.count > 1 && (
+                        <span className={`text-[9px] px-1 rounded-full ${
+                          locationName.toLowerCase() === loc.name.toLowerCase()
+                            ? 'bg-emerald-800 text-white'
+                            : 'bg-stone-100 text-stone-600'
+                        }`}>
+                          {loc.count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[11px] text-stone-500 italic bg-white/70 p-2.5 rounded-xl border border-amber-200">
+                  No saved locations on this plan yet. Enter a location name above or pick a point on the map to create one.
+                </div>
+              )}
             </div>
           </div>
 
