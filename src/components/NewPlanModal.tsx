@@ -15,10 +15,10 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({
   onCreateNewPlan,
 }) => {
   const [templateChoice, setTemplateChoice] = useState<'blank' | 'palermo-creek'>('blank');
-  const [tripName, setTripName] = useState('8th Grade Wilderness Expedition');
+  const [tripName, setTripName] = useState('Nuevo Campamento Escolar');
   const [startDate, setStartDate] = useState('2026-10-28');
   const [numberOfDays, setNumberOfDays] = useState(3);
-  const [expectedStudents, setExpectedStudents] = useState(35);
+  const [expectedStudents, setExpectedStudents] = useState(30);
 
   if (!isOpen) return null;
 
@@ -29,7 +29,7 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({
       const palermoTemplate: TripProject = {
         ...INITIAL_PROJECT,
         id: `trip-${Date.now()}`,
-        tripName: tripName.trim() || '8th Grade Wilderness Expedition',
+        tripName: tripName.trim() || 'Campamento Escolar Palermo - Santa Cruz',
         startDate,
         expectedStudents,
         lastSavedAt: new Date().toISOString(),
@@ -37,7 +37,7 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({
       onCreateNewPlan(palermoTemplate);
     } else {
       const blankPlan = createEmptyTripProject(
-        tripName.trim() || '8th Grade Wilderness Expedition',
+        tripName.trim() || 'Nuevo Campamento Escolar',
         startDate,
         numberOfDays,
         expectedStudents
@@ -97,7 +97,7 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({
                   {templateChoice === 'blank' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
                 </div>
                 <p className="text-[11px] text-stone-500 leading-tight">
-                  Empty timeline. Add your own activities, teachers, and supplies from scratch.
+                  100% blank plan. Zero activities, students, chaperones, or locations on the map.
                 </p>
               </button>
 
@@ -133,7 +133,7 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({
               type="text"
               value={tripName}
               onChange={(e) => setTripName(e.target.value)}
-              placeholder="e.g. Campamento 8vo Grado Palermo"
+              placeholder="e.g. Campamento 8vo Grado"
               required
               className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600"
             />
@@ -143,8 +143,12 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({
           <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-xs text-stone-600 flex items-start gap-2.5">
             <MapPin className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold text-stone-800">Location: </span>
-              <span>Palermo, Santa Cruz, Bolivia (-18.210799, -63.748706) with Arroyo Palermo creek access</span>
+              <span className="font-bold text-stone-800">Map & Coordinates: </span>
+              {templateChoice === 'palermo-creek' ? (
+                <span>Palermo, Santa Cruz, Bolivia (-18.210799, -63.748706) with Arroyo Palermo creek access</span>
+              ) : (
+                <span>Blank map with no pre-pinned markers or locations. Add custom locations as you create activities.</span>
+              )}
             </div>
           </div>
 

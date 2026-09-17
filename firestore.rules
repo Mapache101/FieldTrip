@@ -35,7 +35,8 @@ service cloud.firestore {
         && (!('teachers' in data) || (data.teachers is list && data.teachers.size() <= 100))
         && (!('milestones' in data) || (data.milestones is list && data.milestones.size() <= 200))
         && (!('studentGroups' in data) || (data.studentGroups is list && data.studentGroups.size() <= 50))
-        && (!('students' in data) || (data.students is list && data.students.size() <= 1000));
+        && (!('students' in data) || (data.students is list && data.students.size() <= 1000))
+        && (!('isLocked' in data) || data.isLocked is bool);
     }
 
     // Collaborative trips collection
@@ -43,8 +44,9 @@ service cloud.firestore {
       allow get: if isValidId(tripId);
       allow list: if true;
       allow create: if isValidId(tripId) && incoming().id == tripId && isValidTrip(incoming());
-      allow update: if isValidId(tripId) && isValidTrip(incoming()) && incoming().id == existing().id;
-      allow delete: if isValidId(tripId);
+      allow update: if isValidId(tripId) && isValidTrip(incoming()) && incoming().id == existing().id
+        && (!('isLocked' in existing()) || existing().isLocked != true || incoming().isLocked == false);
+      allow delete: if isValidId(tripId) && (!('isLocked' in existing()) || existing().isLocked != true);
     }
   }
 }

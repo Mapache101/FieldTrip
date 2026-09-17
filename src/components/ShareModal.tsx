@@ -37,6 +37,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const [copiedSnapshotLink, setCopiedSnapshotLink] = useState(false);
   const [copiedJson, setCopiedJson] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [pendingImport, setPendingImport] = useState<TripProject | null>(null);
 
   if (!isOpen) return null;
 
@@ -78,14 +79,45 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         if (!parsed.tripName || !Array.isArray(parsed.days)) {
           throw new Error('Invalid project file schema');
         }
-        onImportProject(parsed);
-        alert(`Successfully imported "${parsed.tripName}"!`);
-        onClose();
+        // Instead of immediate overwrite, show safety choice
+        setPendingImport(parsed);
       } catch (err: any) {
         setImportError('Failed to parse JSON file. Please ensure it is a valid CampQuest plan export.');
       }
     };
     reader.readAsText(file);
+    e.target.value = ''; // Reset input
+  };
+
+  const handleExecuteImportAsNew = () => {
+    if (!pendingImport) return;
+    const newId = `trip-${Date.now()}`;
+    const safeProject: TripProject = {
+      ...pendingImport,
+      id: newId,
+      tripName: `${pendingImport.tripName} (Imported)`,
+      isLocked: false,
+    };
+    onImportProject(safeProject);
+    setPendingImport(null);
+    onClose();
+  };
+
+  const handleExecuteImportOverwrite = () => {
+    if (!pendingImport) return;
+    if (project.isLocked) {
+      setImportError('Current plan is protected against overwrites. Please unlock it first or import as a new plan.');
+      setPendingImport(null);
+      return;
+    }
+    const safeProject: TripProject = {
+      ...pendingImport,
+      id: currentTripId,
+      isLocked: false,
+    };
+    onImportProject(safeProject);
+    setPendingImport(null);
+    onClose();
   };
 
   return (
@@ -249,6 +281,83 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Safety Prompt: Import as New Plan vs Overwrite Current */}
+      {pendingImport && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-stone-900/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl border border-amber-300 shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mb-4 mx-auto">
+              <Upload className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-base font-bold text-center text-stone-900 mb-1">
+              Import Plan: "{pendingImport.tripName}"
+            </h3>
+            <p className="text-xs text-center text-stone-600 mb-5">
+              Choose how you want to import this expedition file:
+            </p>
+
+            <div className="space-y-3 mb-5">
+              {/* Option 1: As New Plan (Safe) */}
+              <button
+                type="button"
+                onClick={handleExecuteImportAsNew}
+                className="w-full text-left p-3.5 rounded-xl border-2 border-emerald-500 bg-emerald-50/70 hover:bg-emerald-100/80 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-emerald-950">
+                    Import as a Brand-New Plan (Recommended)
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-600 text-white">
+                    Safe
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-800 mt-1">
+                  Creates a separate plan without touching or overwriting your currently open plan.
+                </p>
+              </button>
+
+              {/* Option 2: Overwrite Current Plan */}
+              <button
+                type="button"
+                onClick={handleExecuteImportOverwrite}
+                disabled={project.isLocked}
+                className={`w-full text-left p-3.5 rounded-xl border transition-all cursor-pointer ${
+                  project.isLocked
+                    ? 'border-stone-200 bg-stone-50 opacity-60 cursor-not-allowed'
+                    : 'border-stone-300 hover:border-amber-500 bg-white hover:bg-amber-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-stone-900">
+                    Replace Current Plan ("{project.tripName}")
+                  </span>
+                  {project.isLocked && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                      Locked
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-stone-500 mt-1">
+                  {project.isLocked
+                    ? 'Plan is locked. You must unlock it before replacing.'
+                    : 'Warning: This will overwrite the contents of the currently active plan.'}
+                </p>
+              </button>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingImport(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

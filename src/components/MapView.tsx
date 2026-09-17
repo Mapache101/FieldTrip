@@ -122,38 +122,47 @@ export const MapView: React.FC<MapViewProps> = ({
     layerGroup.clearLayers();
     polylinesGroup.clearLayers();
 
-    // 1. Add Basecamp Master Marker
-    const baseCampName = project.baseLocation?.name || 'Base Camp';
-    const baseIcon = L.divIcon({
-      className: 'custom-div-icon',
-      html: `
-        <div class="relative flex items-center justify-center">
-          <div class="absolute w-12 h-12 rounded-full bg-amber-500/30 animate-ping"></div>
-          <div class="w-10 h-10 rounded-2xl bg-amber-600 border-2 border-white text-white flex items-center justify-center shadow-lg font-bold">
-            <span style="font-size: 20px;">⛺</span>
+    // 1. Add Basecamp Master Marker only if explicitly configured on the project
+    if (
+      project.baseLocation &&
+      typeof project.baseLocation.lat === 'number' &&
+      typeof project.baseLocation.lng === 'number' &&
+      Boolean(project.baseLocation.name)
+    ) {
+      const bLat = project.baseLocation.lat;
+      const bLng = project.baseLocation.lng;
+      const bName = project.baseLocation.name;
+      const baseIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `
+          <div class="relative flex items-center justify-center">
+            <div class="absolute w-12 h-12 rounded-full bg-amber-500/30 animate-ping"></div>
+            <div class="w-10 h-10 rounded-2xl bg-amber-600 border-2 border-white text-white flex items-center justify-center shadow-lg font-bold">
+              <span style="font-size: 20px;">⛺</span>
+            </div>
+            <div class="absolute -bottom-6 bg-stone-900/90 text-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap shadow-md border border-amber-500/40">
+              ${bName}
+            </div>
           </div>
-          <div class="absolute -bottom-6 bg-stone-900/90 text-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap shadow-md border border-amber-500/40">
-            ${baseCampName}
-          </div>
-        </div>
-      `,
-      iconSize: [40, 40],
-      iconAnchor: [20, 20],
-    });
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+      });
 
-    const baseMarker = L.marker([baseLat, baseLng], { icon: baseIcon })
-      .addTo(layerGroup)
-      .bindPopup(`
-        <div style="font-family: 'Plus Jakarta Sans', sans-serif; min-width: 220px; padding: 4px;">
-          <div style="font-size: 11px; font-weight: 800; color: #b45309; text-transform: uppercase;">Expedition Headquarters</div>
-          <div style="font-size: 15px; font-weight: 800; color: #1c1917; margin-top: 2px;">${baseCampName}</div>
-          <div style="font-size: 12px; color: #78716c; margin-top: 4px;">${project.destination || 'Field Expedition'}</div>
-          <div style="font-size: 11px; color: #0284c7; font-weight: 600; margin-top: 6px;">GPS: ${baseLat.toFixed(6)}, ${baseLng.toFixed(6)}</div>
-          <div style="margin-top: 8px; font-size: 11px; color: #44403c; background: #fef3c7; padding: 6px; border-radius: 8px; border: 1px solid #fde68a;">
-            Assembly point, first aid tent, and radio control base.
+      L.marker([bLat, bLng], { icon: baseIcon })
+        .addTo(layerGroup)
+        .bindPopup(`
+          <div style="font-family: 'Plus Jakarta Sans', sans-serif; min-width: 220px; padding: 4px;">
+            <div style="font-size: 11px; font-weight: 800; color: #b45309; text-transform: uppercase;">Expedition Headquarters</div>
+            <div style="font-size: 15px; font-weight: 800; color: #1c1917; margin-top: 2px;">${bName}</div>
+            <div style="font-size: 12px; color: #78716c; margin-top: 4px;">${project.destination || 'Field Expedition'}</div>
+            <div style="font-size: 11px; color: #0284c7; font-weight: 600; margin-top: 6px;">GPS: ${bLat.toFixed(6)}, ${bLng.toFixed(6)}</div>
+            <div style="margin-top: 8px; font-size: 11px; color: #44403c; background: #fef3c7; padding: 6px; border-radius: 8px; border: 1px solid #fde68a;">
+              Assembly point, first aid tent, and radio control base.
+            </div>
           </div>
-        </div>
-      `);
+        `);
+    }
 
     // Color definitions per day
     const dayColors: Record<number, { bg: string; border: string; text: string; line: string }> = {
@@ -543,26 +552,39 @@ export const MapView: React.FC<MapViewProps> = ({
 
             {/* Scrollable list of activities with coordinates */}
             <div className="flex-1 overflow-y-auto space-y-2.5 pt-3 pr-1 custom-scrollbar">
-              {/* Basecamp item */}
-              <div 
-                onClick={handleRecenter}
-                className="p-2.5 rounded-2xl bg-amber-200/70 border border-amber-300 cursor-pointer hover:bg-amber-200 transition-colors shadow-2xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-300 px-2 py-0.5 rounded-md">
-                    Expedition HQ
-                  </span>
-                  <span className="text-[10px] font-mono text-amber-900 font-bold">
-                    {baseLat.toFixed(4)}, {baseLng.toFixed(4)}
-                  </span>
+              {/* Basecamp item only if configured */}
+              {project.baseLocation && project.baseLocation.name && (
+                <div 
+                  onClick={handleRecenter}
+                  className="p-2.5 rounded-2xl bg-amber-200/70 border border-amber-300 cursor-pointer hover:bg-amber-200 transition-colors shadow-2xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-300 px-2 py-0.5 rounded-md">
+                      Expedition HQ
+                    </span>
+                    <span className="text-[10px] font-mono text-amber-900 font-bold">
+                      {project.baseLocation.lat.toFixed(4)}, {project.baseLocation.lng.toFixed(4)}
+                    </span>
+                  </div>
+                  <div className="font-display font-black text-xs text-stone-900 mt-1">
+                    ⛺ {project.baseLocation.name}
+                  </div>
+                  <div className="text-[11px] text-stone-600 mt-0.5">
+                    {project.destination || 'Expedition Grounds'}
+                  </div>
                 </div>
-                <div className="font-display font-black text-xs text-stone-900 mt-1">
-                  ⛺ Campamento Base Palermo
+              )}
+
+              {/* Empty state when plan has no mapped locations */}
+              {(!project.baseLocation || !project.baseLocation.name) && project.activities.filter(a => a.coordinates).length === 0 && (
+                <div className="p-4 rounded-2xl bg-amber-50/70 border border-dashed border-amber-200 text-center">
+                  <MapPin className="w-6 h-6 text-amber-600/50 mx-auto mb-1.5" />
+                  <p className="text-xs font-bold text-stone-700">No locations mapped yet</p>
+                  <p className="text-[11px] text-stone-500 mt-1 leading-snug">
+                    Click anywhere on the terrain to drop pins, or add GPS coordinates to your activities.
+                  </p>
                 </div>
-                <div className="text-[11px] text-stone-600 mt-0.5">
-                  Santa Cruz Department, Bolivia
-                </div>
-              </div>
+              )}
 
               {/* Day activities */}
               {project.days.map((day) => {

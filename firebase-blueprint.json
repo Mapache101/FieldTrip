@@ -66,6 +66,10 @@
           "type": "array",
           "description": "Student attendees, houses, and medical dietary requirements"
         },
+        "isLocked": {
+          "type": "boolean",
+          "description": "Protection lock preventing accidental edits, overwrites, or deletions"
+        },
         "lastSavedAt": {
           "type": "string",
           "description": "ISO timestamp of last live edit",

@@ -8,7 +8,11 @@ import {
   Plus, 
   Trash2, 
   RotateCcw, 
-  Save 
+  Save,
+  Lock,
+  Unlock,
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 import { DayPlan, TripProject } from '../types';
 
@@ -34,6 +38,8 @@ export const TripSettingsModal: React.FC<TripSettingsModalProps> = ({
   const [expectedStudents, setExpectedStudents] = useState(project.expectedStudents);
   const [days, setDays] = useState<DayPlan[]>(project.days);
   const [autoShiftDays, setAutoShiftDays] = useState(true);
+  const [isLocked, setIsLocked] = useState(Boolean(project.isLocked));
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -43,6 +49,8 @@ export const TripSettingsModal: React.FC<TripSettingsModalProps> = ({
       setEndDate(project.endDate);
       setExpectedStudents(project.expectedStudents);
       setDays(project.days);
+      setIsLocked(Boolean(project.isLocked));
+      setShowResetConfirm(false);
     }
   }, [isOpen, project]);
 
@@ -152,6 +160,7 @@ export const TripSettingsModal: React.FC<TripSettingsModalProps> = ({
       endDate,
       expectedStudents: Number(expectedStudents) || 30,
       days,
+      isLocked,
     });
     onClose();
   };
@@ -176,6 +185,40 @@ export const TripSettingsModal: React.FC<TripSettingsModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto custom-scrollbar">
+          {/* Overwrite Protection Lock Card */}
+          <div className="bg-amber-100/90 p-4 rounded-2xl border-2 border-amber-300 flex items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-200/90 border border-amber-400 flex items-center justify-center text-amber-900 shrink-0 mt-0.5">
+                {isLocked ? <Lock className="w-4 h-4 text-amber-900" /> : <Unlock className="w-4 h-4 text-amber-700" />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-xs text-amber-950">
+                    Lock Plan (Prevent Accidental Overwrites)
+                  </span>
+                  {isLocked && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-700 text-white">
+                      Protected
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-amber-900 mt-0.5 leading-normal">
+                  Prevents accidental edits, card movement, schedule modifications, and resets.
+                </p>
+              </div>
+            </div>
+
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={isLocked}
+                onChange={(e) => setIsLocked(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-700"></div>
+            </label>
+          </div>
+
           {/* Trip Name */}
           <div>
             <label className="block text-xs font-black uppercase text-amber-950 mb-1">
@@ -330,15 +373,21 @@ export const TripSettingsModal: React.FC<TripSettingsModalProps> = ({
             <button
               type="button"
               onClick={() => {
-                if (confirm('Reset the trip back to default sample activities and schedule? Custom edits will be overwritten.')) {
-                  onResetToSampleData();
-                  onClose();
+                if (isLocked) {
+                  alert('This plan is locked against overwrites. Please unlock it first to reset to sample data.');
+                  return;
                 }
+                setShowResetConfirm(true);
               }}
-              className="text-xs font-bold text-stone-500 hover:text-amber-800 flex items-center gap-1"
+              className={`text-xs font-bold flex items-center gap-1.5 ${
+                isLocked 
+                  ? 'text-stone-400 cursor-not-allowed' 
+                  : 'text-stone-500 hover:text-amber-800'
+              }`}
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Reset to Sample Data</span>
+              {isLocked && <Lock className="w-3 h-3 text-stone-400" />}
             </button>
 
             <div className="flex items-center gap-2">
@@ -360,6 +409,47 @@ export const TripSettingsModal: React.FC<TripSettingsModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Safety Confirmation for Resetting to Sample Data */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-stone-900/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl border-2 border-amber-400 shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mb-4 mx-auto">
+              <AlertTriangle className="w-6 h-6 text-amber-700" />
+            </div>
+
+            <h3 className="text-base font-bold text-center text-stone-900 mb-2">
+              Overwrite Plan with Sample Data?
+            </h3>
+
+            <p className="text-xs text-center text-stone-600 mb-5 leading-relaxed">
+              This will replace all activities, schedules, and custom settings in{' '}
+              <strong className="text-stone-900">"{tripName}"</strong> with the default expedition template. Custom edits in this plan will be lost.
+            </p>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-stone-700 hover:bg-stone-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onResetToSampleData();
+                  setShowResetConfirm(false);
+                  onClose();
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-700 hover:bg-amber-800 text-white shadow-xs"
+              >
+                Yes, Overwrite with Sample Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

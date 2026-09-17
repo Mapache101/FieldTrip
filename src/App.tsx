@@ -7,6 +7,10 @@ import {
   setTripIdInUrl,
   subscribeToTrip,
   saveTripToCloud,
+  deleteTripFromCloud,
+  duplicateTripInCloud,
+  setTripLockStatus,
+  TripSummary,
   DEFAULT_TRIP_ID,
 } from './services/tripSyncService';
 import { Header } from './components/Header';
@@ -23,6 +27,7 @@ import { TripSettingsModal } from './components/TripSettingsModal';
 import { ShareModal } from './components/ShareModal';
 import { PrintSummary } from './components/PrintSummary';
 import { NewPlanModal } from './components/NewPlanModal';
+import { PlanManagerModal } from './components/PlanManagerModal';
 
 const STORAGE_KEY = 'CAMPQUEST_TRIP_PROJECT_V2';
 
@@ -50,11 +55,11 @@ export default function App() {
           ) {
             parsed.tripName = '8th Grade Wilderness Expedition';
           }
-          if (!parsed.studentGroups || parsed.studentGroups.length === 0) {
-            parsed.studentGroups = INITIAL_PROJECT.studentGroups;
+          if (!parsed.studentGroups) {
+            parsed.studentGroups = [];
           }
-          if (!parsed.students || parsed.students.length === 0) {
-            parsed.students = INITIAL_PROJECT.students;
+          if (!parsed.students) {
+            parsed.students = [];
           }
           return parsed;
         }
@@ -93,14 +98,16 @@ export default function App() {
             ...prev,
             ...remoteProject,
             id: remoteProject.id || tripId,
-            days: remoteProject.days || prev.days,
-            activities: remoteProject.activities || prev.activities,
-            supplies: remoteProject.supplies || prev.supplies,
-            studentItems: remoteProject.studentItems || prev.studentItems,
-            teachers: remoteProject.teachers || prev.teachers,
-            milestones: remoteProject.milestones || prev.milestones,
-            studentGroups: remoteProject.studentGroups || prev.studentGroups,
-            students: remoteProject.students || prev.students,
+            destination: remoteProject.destination !== undefined ? remoteProject.destination : prev.destination,
+            baseLocation: remoteProject.baseLocation !== undefined ? remoteProject.baseLocation : undefined,
+            days: remoteProject.days !== undefined ? remoteProject.days : prev.days,
+            activities: remoteProject.activities !== undefined ? remoteProject.activities : prev.activities,
+            supplies: remoteProject.supplies !== undefined ? remoteProject.supplies : prev.supplies,
+            studentItems: remoteProject.studentItems !== undefined ? remoteProject.studentItems : prev.studentItems,
+            teachers: remoteProject.teachers !== undefined ? remoteProject.teachers : prev.teachers,
+            milestones: remoteProject.milestones !== undefined ? remoteProject.milestones : prev.milestones,
+            studentGroups: remoteProject.studentGroups !== undefined ? remoteProject.studentGroups : prev.studentGroups,
+            students: remoteProject.students !== undefined ? remoteProject.students : prev.students,
           }));
           setLastSyncedTime(
             new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -124,6 +131,12 @@ export default function App() {
     if (!hasLoadedRemoteRef.current) return;
     // Skip if incoming update was triggered by remote snapshot listener
     if (isRemoteUpdateRef.current) return;
+
+    // Guard against overwriting locked plans: do not auto-save if locked
+    if (project.isLocked) {
+      setSyncStatus('connected');
+      return;
+    }
 
     setSyncStatus('saving');
     const timer = setTimeout(async () => {
@@ -162,6 +175,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isNewPlanOpen, setIsNewPlanOpen] = useState(false);
+  const [isPlanManagerOpen, setIsPlanManagerOpen] = useState(false);
   const [printMode, setPrintMode] = useState<'none' | 'all' | 'student-packing'>('none');
 
   // Save to localStorage on changes as offline fallback
@@ -416,6 +430,87 @@ export default function App() {
     setIsActivityModalOpen(true);
   };
 
+  // Handler: Select and switch to a different plan
+  const handleSelectTrip = (targetTripId: string) => {
+    if (targetTripId === tripId) {
+      setIsPlanManagerOpen(false);
+      return;
+    }
+    isRemoteUpdateRef.current = false;
+    hasLoadedRemoteRef.current = false;
+    setTripId(targetTripId);
+    setTripIdInUrl(targetTripId);
+    setIsPlanManagerOpen(false);
+  };
+
+  // Handler: Duplicate an existing plan as a safe unlocked copy (prevents overwriting)
+  const handleDuplicateTrip = async (trip: TripSummary) => {
+    const source = trip.id === tripId ? project : trip.id;
+    const newProject = await duplicateTripInCloud(source);
+    isRemoteUpdateRef.current = true;
+    hasLoadedRemoteRef.current = true;
+    setTripId(newProject.id);
+    setTripIdInUrl(newProject.id);
+    setProject(newProject);
+    setActiveDayId(newProject.days[0]?.id || 'day-1');
+    setIsPlanManagerOpen(false);
+    setTimeout(() => {
+      isRemoteUpdateRef.current = false;
+    }, 300);
+  };
+
+  // Handler: Delete an old plan from Firestore
+  const handleDeleteTrip = async (tripIdToDelete: string) => {
+    await deleteTripFromCloud(tripIdToDelete);
+    if (tripIdToDelete === tripId) {
+      isRemoteUpdateRef.current = false;
+      hasLoadedRemoteRef.current = false;
+      setTripId(DEFAULT_TRIP_ID);
+      setTripIdInUrl(DEFAULT_TRIP_ID);
+    }
+  };
+
+  // Handler: Toggle plan lock status (overwrite protection)
+  const handleToggleLockTrip = async (targetTripId: string, isCurrentlyLocked: boolean) => {
+    const nextLock = !isCurrentlyLocked;
+    await setTripLockStatus(targetTripId, nextLock);
+    if (targetTripId === tripId) {
+      setProject((prev) => ({ ...prev, isLocked: nextLock }));
+    }
+  };
+
+  // Handler: Toggle lock on the currently active plan
+  const handleToggleLockCurrentPlan = async () => {
+    const nextLock = !Boolean(project.isLocked);
+    if (nextLock) {
+      await setTripLockStatus(tripId, true);
+      setProject((prev) => ({ ...prev, isLocked: true }));
+    } else {
+      if (confirm(`Unlock "${project.tripName}"? Collaborators will be able to make changes to this plan.`)) {
+        await setTripLockStatus(tripId, false);
+        setProject((prev) => ({ ...prev, isLocked: false }));
+      }
+    }
+  };
+
+  // Handler: Quick duplicate current plan from Header
+  const handleDuplicateCurrentPlan = async () => {
+    try {
+      const newProject = await duplicateTripInCloud(project);
+      isRemoteUpdateRef.current = true;
+      hasLoadedRemoteRef.current = true;
+      setTripId(newProject.id);
+      setTripIdInUrl(newProject.id);
+      setProject(newProject);
+      setActiveDayId(newProject.days[0]?.id || 'day-1');
+      setTimeout(() => {
+        isRemoteUpdateRef.current = false;
+      }, 300);
+    } catch (err: any) {
+      alert('Could not duplicate plan: ' + (err?.message || 'Unknown error'));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-stone-50/70 flex flex-col selection:bg-emerald-600 selection:text-white pb-16">
       {/* Top Navigation Header */}
@@ -432,6 +527,9 @@ export default function App() {
         onOpenShare={() => setIsShareOpen(true)}
         onPrint={() => setPrintMode('all')}
         onOpenNewPlan={() => setIsNewPlanOpen(true)}
+        onOpenPlanManager={() => setIsPlanManagerOpen(true)}
+        onToggleLockCurrentPlan={handleToggleLockCurrentPlan}
+        onDuplicateCurrentPlan={handleDuplicateCurrentPlan}
         syncStatus={syncStatus}
         lastSyncedTime={lastSyncedTime}
       />
@@ -597,7 +695,12 @@ export default function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         project={project}
-        onSave={(updated) => setProject((prev) => ({ ...prev, ...updated }))}
+        onSave={(updated) => {
+          if (updated.isLocked !== undefined && updated.isLocked !== project.isLocked) {
+            setTripLockStatus(tripId, Boolean(updated.isLocked)).catch(console.warn);
+          }
+          setProject((prev) => ({ ...prev, ...updated }));
+        }}
         onResetToSampleData={handleResetToSampleData}
       />
 
@@ -622,16 +725,44 @@ export default function App() {
       <NewPlanModal
         isOpen={isNewPlanOpen}
         onClose={() => setIsNewPlanOpen(false)}
-        onCreateNewPlan={(newProject) => {
+        onCreateNewPlan={async (newProject) => {
           const newId = newProject.id || `trip-${Date.now()}`;
-          setTripId(newId);
-          setTripIdInUrl(newId);
-          setProject({
+          const projectToSet: TripProject = {
             ...newProject,
             id: newId,
-          });
-          setActiveDayId(newProject.days[0]?.id || 'day-1');
+          };
+          isRemoteUpdateRef.current = true;
+          hasLoadedRemoteRef.current = true;
+          setTripId(newId);
+          setTripIdInUrl(newId);
+          setProject(projectToSet);
+          setActiveDayId(projectToSet.days[0]?.id || 'day-1');
           setActiveTab('timeline');
+          try {
+            await saveTripToCloud(projectToSet);
+          } catch (e) {
+            console.warn('Could not save new plan to cloud:', e);
+          } finally {
+            setTimeout(() => {
+              isRemoteUpdateRef.current = false;
+            }, 300);
+          }
+        }}
+      />
+
+      {/* Plan Manager Modal: Switch, Duplicate, Lock & Delete Plans */}
+      <PlanManagerModal
+        isOpen={isPlanManagerOpen}
+        onClose={() => setIsPlanManagerOpen(false)}
+        currentTripId={tripId}
+        currentProject={project}
+        onSelectTrip={handleSelectTrip}
+        onDuplicateTrip={handleDuplicateTrip}
+        onDeleteTrip={handleDeleteTrip}
+        onToggleLockTrip={handleToggleLockTrip}
+        onOpenNewPlan={() => {
+          setIsPlanManagerOpen(false);
+          setIsNewPlanOpen(true);
         }}
       />
 

@@ -923,10 +923,10 @@ export const INITIAL_PROJECT: TripProject = {
  * Creates an empty, blank trip plan from scratch
  */
 export function createEmptyTripProject(
-  tripName: string = '8th Grade Wilderness Expedition',
+  tripName: string = 'Nuevo Campamento Escolar',
   startDate: string = '2026-10-28',
   numberOfDays: number = 3,
-  expectedStudents: number = 35
+  expectedStudents: number = 30
 ): TripProject {
   const start = new Date(startDate || '2026-10-28');
   const days = [];
@@ -939,9 +939,9 @@ export function createEmptyTripProject(
       id: `day-${i + 1}`,
       dayNumber: i + 1,
       dateStr,
-      title: `Día ${i + 1}: Actividades`,
+      title: `Día ${i + 1}`,
       subtitle: `Planificación del día ${i + 1}`,
-      startTime: i === 0 ? '09:00' : '08:00',
+      startTime: '08:00',
       activityIds: [],
     });
   }
@@ -952,85 +952,19 @@ export function createEmptyTripProject(
 
   return {
     id: `trip-${Date.now()}`,
-    tripName,
-    destination: 'Palermo, Santa Cruz, Bolivia (-18.210799, -63.748706)',
-    baseLocation: {
-      name: 'Palermo, Santa Cruz, Bolivia',
-      lat: -18.210799,
-      lng: -63.748706,
-      zoom: 15,
-    },
+    tripName: tripName || 'Nuevo Campamento Escolar',
+    destination: '',
+    baseLocation: undefined,
     startDate,
     endDate,
     expectedStudents,
     days,
     activities: [],
-    supplies: [
-      { id: 'sup-1', name: 'Botiquín de Primeros Auxilios', category: 'safety', quantityNeeded: 2, unit: 'kits', providedBy: 'school', status: 'packed' },
-      { id: 'sup-2', name: 'Radios de Comunicación', category: 'safety', quantityNeeded: 4, unit: 'pcs', providedBy: 'school', status: 'needed' },
-    ],
-    studentItems: [
-      { id: 's-1', name: 'Bolsa de Dormir (Sleeping Bag)', category: 'bedding', isRequired: true },
-      { id: 's-2', name: 'Aislante Térmico / Colchoneta', category: 'bedding', isRequired: true },
-      { id: 's-3', name: 'Zapatillas de Trekking', category: 'footwear', isRequired: true },
-      { id: 's-4', name: 'Calzado para Arroyo / Agua', category: 'footwear', isRequired: true, notes: 'Para caminar en el arroyo' },
-      { id: 's-5', name: 'Botella de Agua Reutilizable (1L)', category: 'safety', isRequired: true },
-      { id: 's-6', name: 'Linterna Frontal con Pilas', category: 'safety', isRequired: true },
-      { id: 's-7', name: 'Kit de Aseo y Toalla de Secado Rápido', category: 'toiletries', isRequired: true },
-      { id: 's-8', name: 'Repelente y Protector Solar', category: 'toiletries', isRequired: true },
-    ],
-    teachers: INITIAL_TEACHERS.slice(0, 3),
-    milestones: [
-      {
-        id: 'm-1',
-        title: 'Aprobación Institucional del Viaje',
-        dueDate: '2026-09-15',
-        category: 'approval',
-        completed: false,
-        assignedTo: 'Coordinador',
-        description: 'Aprobación de dirección y plan de seguridad.',
-      },
-      {
-        id: 'm-2',
-        title: 'Reunión Informativa con Padres',
-        dueDate: '2026-10-01',
-        category: 'parents',
-        completed: false,
-        assignedTo: 'Equipo Docente',
-        description: 'Entrega de lista de materiales y cronograma.',
-      },
-      {
-        id: 'm-3',
-        title: 'Salida del Campamento',
-        dueDate: startDate,
-        category: 'logistics',
-        completed: false,
-        assignedTo: 'Todos',
-        description: 'Partida hacia Palermo, Santa Cruz.',
-      },
-    ],
-    studentGroups: [
-      {
-        id: 'group-1',
-        name: 'Grupo 1 - Primera Llegada (Alpha)',
-        badgeColor: 'emerald',
-        arrivalDate: startDate,
-        arrivalTime: '08:30',
-        departureDate: endDate,
-        departureTime: '12:00',
-        notes: 'Primer grupo en llegar al campamento base.',
-      },
-      {
-        id: 'group-2',
-        name: 'Grupo 2 - Segunda Llegada (Bravo)',
-        badgeColor: 'amber',
-        arrivalDate: startDate,
-        arrivalTime: '13:30',
-        departureDate: endDate,
-        departureTime: '15:30',
-        notes: 'Segundo grupo en arribar al campamento.',
-      },
-    ],
+    supplies: [],
+    studentItems: [],
+    teachers: [],
+    milestones: [],
+    studentGroups: [],
     students: [],
     lastSavedAt: new Date().toISOString(),
   };

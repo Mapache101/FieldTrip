@@ -124,6 +124,7 @@ export interface TripProject {
   id: string;
   tripName: string;
   destination: string;
+  isLocked?: boolean; // Protection lock against accidental edits, overwrites, or deletions
   baseLocation?: {
     name: string;
     lat: number;
